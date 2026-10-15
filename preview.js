@@ -1,56 +1,104 @@
-const results=document.getElementById('results'),status=document.getElementById('status');let counts=null,liveItems=[];
-function el(tag,text,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
-function render(){
- const trade=document.getElementById('trade').value;
- const query=document.getElementById('search').value.trim().toLowerCase();
- results.replaceChildren();
- if(!counts){status.textContent='Live source totals unavailable. No opportunity count can be verified at this time.';return;}
- const count=trade?(trade==='Unclassified'?counts.unclassified:(counts.byTrade||{})[trade]||0):counts.total;
- const checked=new Date(counts.checkedAt),valid=Number.isFinite(checked.getTime());
- const age=valid?Date.now()-checked.getTime():Infinity;
- if(age>86400000||age< -300000){status.textContent='Source totals are stale or undated; current opportunity count cannot be verified.';return;}
- status.textContent=(liveItems.length?liveItems.length+' source-linked candidate notices':count+' source notices')+' · Last checked '+checked.toLocaleString()+'. Verify scope and deadlines with each issuing agency.';
- const tradeItems=liveItems.filter(item=>(!trade||String(item.trade||item.category||'').toLowerCase().includes(trade.toLowerCase()))&&(!query||[item.title,item.agency,item.city,item.deadline,item.source].some(v=>String(v||'').toLowerCase().includes(query))));
- for(const item of tradeItems.slice(0,250)){
-   const title=String(item.title||item.name||'Untitled solicitation');
-   const url=item.sourceUrl||item.url||item.link||item.noticeUrl;
-   if(typeof url!=='string'||!/^https:\/\//i.test(url))continue;
-   const card=el('article','','card');
-   card.append(el('span','SOURCE-LINKED OPPORTUNITY','tag'),el('h2',title));
-   card.append(el('p',[item.agency||item.organization,item.city,item.deadline||item.dueDate].filter(Boolean).join(' · '),'detail'));
-   const a=el('a','Review original notice →');a.href=url;a.target='_blank';a.rel='noopener noreferrer';card.append(a);results.append(card);
- }
- if(results.children.length)return;
- const sources=Array.isArray(counts.sources)?counts.sources:[];
- for(const source of sources){
-  const card=el('article','','card');
-  card.append(el('span',source.available?'SOURCE RESPONDING':'SOURCE UNAVAILABLE','tag'),el('h2',source.name||source.label||'Procurement source'),el('p','Review the issuing agency’s current solicitation details, eligibility and deadline.','detail'));
-  const url=source.url||source.sourceUrl||source.website;
-  if(typeof url==='string'&&/^https:\/\//i.test(url)){const a=el('a','Visit official source →');a.href=url;a.target='_blank';a.rel='noopener noreferrer';card.append(a);}
-  results.append(card);
- }
- if(!sources.length)results.append(el('p','Source details are not currently available. Please check back after the next feed refresh.'));
+const results = document.getElementById('results');
+const status = document.getElementById('status');
+const retry = document.getElementById('retry');
+let counts = null, liveItems = [], loading = false;
+const MAX_AGE = 86400000;
+function el(tag, text, cls) {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
 }
-document.getElementById('trade').addEventListener('input',render);
-for(const id of ['sector','kind'])document.getElementById(id).hidden=true;
-document.getElementById('search').addEventListener('input',render);
-async function load(){try{
- let data=null;
- try{
-   const local=await fetch('./data/construction-bids.json',{cache:'no-store'});
-   if(local.ok){
-     const candidate=await local.json();
-     if(Array.isArray(candidate.opportunities)&&candidate.opportunities.length&&Number.isFinite(new Date(candidate.checkedAt).getTime())&&Date.now()-new Date(candidate.checkedAt).getTime()<=86400000&&new Date(candidate.checkedAt).getTime()<=Date.now()+300000)data=candidate;
-   }
- }catch{}
- if(!data){
-   const r=await fetch('https://bidradar-api.bidradar-alerts-help.workers.dev/opportunities?summary=3',{cache:'no-store'});
-   if(!r.ok)throw Error('Source request failed');
-   data=await r.json();
- }
- if(!Number.isSafeInteger(data.total)||data.total<0||!data.checkedAt)throw Error('Invalid source data');
- const verifiedTime=new Date(data.checkedAt).getTime();
- if(!Number.isFinite(verifiedTime)||Date.now()-verifiedTime>86400000||verifiedTime>Date.now()+300000)throw Error('Stale or invalid source data');
- counts=data;liveItems=Array.isArray(data.opportunities)?data.opportunities:Array.isArray(data.items)?data.items:[];render();
- }catch{counts=null;liveItems=[];render();}}
-load();setInterval(load,900000);
+function fresh(data) {
+  const timestamp = new Date(data?.checkedAt).getTime();
+  const age = Date.now() - timestamp;
+  return Number.isSafeInteger(data?.total) && data.total >= 0 &&
+    Number.isFinite(timestamp) && age <= MAX_AGE && age >= -300000;
+}
+function safeUrl(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; }
+  catch { return null; }
+}
+function render() {
+  results.replaceChildren();
+  document.getElementById('search').hidden = !liveItems.length;
+  if (!counts || !fresh(counts)) {
+    status.textContent = loading ? 'Loading official sources…' : 'Current source data is unavailable or outdated. Retry to check again.';
+    return;
+  }
+  const trade = document.getElementById('trade').value;
+  const query = document.getElementById('search').value.trim().toLowerCase();
+  const count = trade ? (trade === 'Unclassified' ? counts.unclassified : counts.byTrade?.[trade]) : counts.total;
+  const sources = Array.isArray(counts.sources) ? counts.sources : [];
+  const unavailable = sources.filter(source => source.available !== true).length;
+  const totalText = Number.isSafeInteger(count) && count >= 0 ? `${count} source notices` : 'Trade count unavailable';
+  status.textContent = `${totalText}${trade ? ' matching '+trade : ''} · Checked ${new Date(counts.checkedAt).toLocaleString()}.` +
+    (sources.length ? ` ${sources.length-unavailable} of ${sources.length} sources responding.` : '') +
+    ' Counts can overlap across trades; verify scope and deadlines with the agency.';
+  if (unavailable) status.textContent += ' Coverage is incomplete while some sources are unavailable.';
+  const matching = liveItems.filter(item => {
+    const trades = Array.isArray(item.trades) ? item.trades : [item.trade || item.category || 'Unclassified'];
+    return (!trade || trades.some(value => String(value).toLowerCase() === trade.toLowerCase())) &&
+      (!query || [item.title, item.name, item.agency, item.organization, item.city, item.deadline, item.source].some(value => String(value || '').toLowerCase().includes(query)));
+  });
+  let shown = 0;
+  for (const item of matching) {
+    const url = safeUrl(item.sourceUrl || item.url || item.link || item.noticeUrl);
+    if (!url) continue;
+    const card = el('article', '', 'card');
+    card.append(el('span', 'SOURCE-LINKED CANDIDATE', 'tag'), el('h2', String(item.title || item.name || 'Untitled solicitation')),
+      el('p', [item.agency || item.organization, item.city, item.deadline || item.dueDate].filter(Boolean).join(' · '), 'detail'));
+    const link = el('a', 'Review original notice →');
+    link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    card.append(link); results.append(card);
+    if (++shown === 250) break;
+  }
+  if (liveItems.length) {
+    status.textContent += ` Showing ${shown} matching candidate notices${shown === 250 ? ' (display limit 250)' : ''}.`;
+    if (!shown) results.append(el('p', 'No usable notices match these filters. Try another trade or clear your search.'));
+    return;
+  }
+  results.append(el('p', 'The public API currently provides source totals only, not individual bid details. Use the email-verified trial or member dashboard to explore available listings.'));
+  const member = el('a', 'Explore trial signup →'); member.href = 'start.html'; results.append(member);
+  for (const source of sources) {
+    const card = el('article', '', 'card');
+    card.append(el('span', source.available === true ? 'SOURCE RESPONDING' : 'SOURCE UNAVAILABLE', 'tag'), el('h2', String(source.name || source.label || 'Procurement source')));
+    card.append(el('p', source.available === true ? 'Source responded at the last check. This is not an individual bid listing.' : 'This source could not be checked. Its notices may be missing from the totals.', 'detail'));
+    const url = safeUrl(source.url || source.sourceUrl || source.website);
+    if (url) { const link = el('a', 'Visit official source →'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; card.append(link); }
+    results.append(card);
+  }
+}
+for (const id of ['trade', 'search']) document.getElementById(id).addEventListener('input', render);
+for (const id of ['sector', 'kind']) document.getElementById(id).hidden = true;
+async function fetchJson(url) {
+  const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.timeout(12000)});
+  if (!response.ok) throw Error('Request failed');
+  const data = await response.json();
+  if (!fresh(data)) throw Error('Invalid or stale data');
+  return data;
+}
+async function load() {
+  if (loading) return;
+  loading = true; retry.hidden = true; results.setAttribute('aria-busy', 'true');
+  counts = null; liveItems = []; render();
+  try {
+    let data;
+    try {
+      const candidate = await fetchJson('./data/construction-bids.json');
+      if (Array.isArray(candidate.opportunities) && candidate.opportunities.length) data = candidate;
+    } catch {}
+    if (!data) {
+      const origin = location.hostname === 'bidradaralerts.com' || location.hostname === 'www.bidradaralerts.com'
+        ? location.origin : 'https://bidradar-api.bidradar-alerts-help.workers.dev';
+      data = await fetchJson(origin + '/opportunities?summary=3');
+    }
+    counts = data;
+    liveItems = (Array.isArray(data.opportunities) ? data.opportunities : Array.isArray(data.items) ? data.items : []).filter(item => item && typeof item === 'object');
+  } catch { counts = null; liveItems = []; }
+  finally {
+    loading = false; retry.hidden = !!counts; results.setAttribute('aria-busy', 'false'); render();
+  }
+}
+retry.addEventListener('click', load);
+load(); setInterval(load, 900000);
