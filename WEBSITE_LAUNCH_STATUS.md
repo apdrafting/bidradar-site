@@ -23,8 +23,9 @@ Scope: website only. No SignalEngine changes, ingestion changes, customer emails
 
 1. Review and approve this website PR. Existing website PR #1 also touches `preview.js`; reconcile its changes before merging both. No collector or ingestion files were modified here.
 2. Identify the authorized website asset deployment path. The public domain currently serves a newer asset set than this repo, so merging this PR alone must not be described as a verified custom-domain deployment. Do not overwrite backend-owned Worker assets or routes.
-3. Browser visual verification of the new local pages remains incomplete: local preview requests timed out in this environment, including after restarting the preview outside the network sandbox. Automated frontend tests pass; they do not replace mobile/browser acceptance.
+3. Local browser checks passed for trade selection updates, hidden unconfigured checkout, billing/unsubscribe guidance, and phone-width onboarding layout without horizontal overflow. Initial loopback access failed; restarting the local server outside the network sandbox and using localhost resolved it. Screenshot saved with the session outputs. Custom-domain post-deployment acceptance remains pending.
 4. Configure an owner-approved public Stripe TEST Payment Link for the $19/month test product, then verify checkout and its backend test fulfillment. No secrets belong in this public config. Backend test support requires a separate coordinated change outside this scope.
 5. Verify actual consent-email delivery, confirmation, unsubscribe, portal cancellation, and entitlement state with an authorized test identity. No real customer signup or email was initiated here.
 
 Until these gates pass, this is a reviewable website milestone, not a completed paid launch.
+
