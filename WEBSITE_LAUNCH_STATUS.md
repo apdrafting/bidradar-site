@@ -29,3 +29,14 @@ Scope: website only. No SignalEngine changes, ingestion changes, customer emails
 
 Until these gates pass, this is a reviewable website milestone, not a completed paid launch.
 
+
+## Payment and email follow-up — October 15, 2026, 10:14 AM Pacific
+
+- Jules' current session is linked to SignalEngine PR #4, which separates construction bids from general procurement. No payment/email changes by this agent were made in SignalEngine.
+- Created sandbox product `prod_VRlfMVOpN9yeh0`, monthly USD 19 price `price_1UQs7lPf1YonePBPrFexnC4b`, and Payment Link `plink_1UQs9rPf1YonePBPmtOxDNk5` in the existing BidRadar Stripe test account.
+- Verified actual hosted checkout at https://buy.stripe.com/test_bJe7sN6Gvein0vk8ts7N600 with Sandbox banner, $19/month, required business name, trade keywords, and LA County service area.
+- Completed one test-card checkout using Stripe's documented 4242 test card. Hosted confirmation displayed the custom sandbox-success message, $19, and Visa ending 4242. No live payment was made. Saved `BidRadar-stripe-test-success.jpg` in session outputs. This proves Stripe sandbox checkout, not backend entitlement fulfillment.
+- Activated test-only portal configuration `bpc_1UQsD3Pf1YonePBPEKai8iqT`; verified test login link https://billing.stripe.com/p/login/test_bJe7sN6Gvein0vk8ts7N600. Cancellation settings allow cancellation at period end. Customer login and completed cancellation are not yet verified.
+- Website billing config now uses the verified test Payment Link; management page includes the separate test portal. Not merged or deployed.
+- Public `/health` reports `delivery: consent_required`. Submitted one self-addressed trial verification request to the BidRadar support mailbox; actual service response displayed "Check your email." Inbox receipt remains UNVERIFIED: Gmail connector returned permission/rate-limit failure and Gmail browser failed to load.
+- Backend test fulfillment still needs a separate isolated change because current reconciliation only accepts live Stripe records and a different Payment Link. Explicit approval requested to make payment/email-only SignalEngine changes, preserving the earlier prohibition until answered. Ingestion work remains excluded.
