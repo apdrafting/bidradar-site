@@ -40,7 +40,7 @@ async function load(){try{
    const local=await fetch('./data/construction-bids.json',{cache:'no-store'});
    if(local.ok){
      const candidate=await local.json();
-     if(Array.isArray(candidate.opportunities)&&candidate.opportunities.length)data=candidate;
+     if(Array.isArray(candidate.opportunities)&&candidate.opportunities.length&&Number.isFinite(new Date(candidate.checkedAt).getTime())&&Date.now()-new Date(candidate.checkedAt).getTime()<=86400000&&new Date(candidate.checkedAt).getTime()<=Date.now()+300000)data=candidate;
    }
  }catch{}
  if(!data){
