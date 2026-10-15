@@ -49,6 +49,8 @@ async function load(){try{
    data=await r.json();
  }
  if(!Number.isSafeInteger(data.total)||data.total<0||!data.checkedAt)throw Error('Invalid source data');
+ const verifiedTime=new Date(data.checkedAt).getTime();
+ if(!Number.isFinite(verifiedTime)||Date.now()-verifiedTime>86400000||verifiedTime>Date.now()+300000)throw Error('Stale or invalid source data');
  counts=data;liveItems=Array.isArray(data.opportunities)?data.opportunities:Array.isArray(data.items)?data.items:[];render();
  }catch{counts=null;liveItems=[];render();}}
 load();setInterval(load,900000);
