@@ -33,9 +33,19 @@ function render(){
 document.getElementById('trade').addEventListener('input',render);
 for(const id of ['sector','kind','search'])document.getElementById(id).hidden=true;
 async function load(){try{
- const r=await fetch('https://bidradar-api.bidradar-alerts-help.workers.dev/opportunities?summary=3',{cache:'no-store'});
- if(!r.ok)throw Error('Source request failed');
- const data=await r.json();
+ let data=null;
+ try{
+   const local=await fetch('./data/construction-bids.json',{cache:'no-store'});
+   if(local.ok){
+     const candidate=await local.json();
+     if(Array.isArray(candidate.opportunities)&&candidate.opportunities.length)data=candidate;
+   }
+ }catch{}
+ if(!data){
+   const r=await fetch('https://bidradar-api.bidradar-alerts-help.workers.dev/opportunities?summary=3',{cache:'no-store'});
+   if(!r.ok)throw Error('Source request failed');
+   data=await r.json();
+ }
  if(!Number.isSafeInteger(data.total)||data.total<0||!data.checkedAt)throw Error('Invalid source data');
  counts=data;liveItems=Array.isArray(data.opportunities)?data.opportunities:Array.isArray(data.items)?data.items:[];render();
  }catch{counts=null;liveItems=[];render();}}
