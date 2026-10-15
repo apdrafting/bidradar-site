@@ -2,14 +2,15 @@ const results=document.getElementById('results'),status=document.getElementById(
 function el(tag,text,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;}
 function render(){
  const trade=document.getElementById('trade').value;
+ const query=document.getElementById('search').value.trim().toLowerCase();
  results.replaceChildren();
  if(!counts){status.textContent='Live source totals unavailable. No opportunity count can be verified at this time.';return;}
  const count=trade?(trade==='Unclassified'?counts.unclassified:(counts.byTrade||{})[trade]||0):counts.total;
  const checked=new Date(counts.checkedAt),valid=Number.isFinite(checked.getTime());
  const age=valid?Date.now()-checked.getTime():Infinity;
  if(age>86400000||age< -300000){status.textContent='Source totals are stale or undated; current opportunity count cannot be verified.';return;}
- status.textContent=count+' source notices'+(trade?' tagged '+trade:' across connected sources')+' · Last checked '+checked.toLocaleString()+'. These are not necessarily construction bids; trade labels may overlap.';
- const tradeItems=liveItems.filter(item=>!trade||String(item.trade||item.category||'').toLowerCase().includes(trade.toLowerCase()));
+ status.textContent=(liveItems.length?liveItems.length+' source-linked candidate notices':count+' source notices')+' · Last checked '+checked.toLocaleString()+'. Verify scope and deadlines with each issuing agency.';
+ const tradeItems=liveItems.filter(item=>(!trade||String(item.trade||item.category||'').toLowerCase().includes(trade.toLowerCase()))&&(!query||[item.title,item.agency,item.city,item.deadline,item.source].some(v=>String(v||'').toLowerCase().includes(query))));
  for(const item of tradeItems.slice(0,250)){
    const title=String(item.title||item.name||'Untitled solicitation');
    const url=item.sourceUrl||item.url||item.link||item.noticeUrl;
@@ -31,7 +32,8 @@ function render(){
  if(!sources.length)results.append(el('p','Source details are not currently available. Please check back after the next feed refresh.'));
 }
 document.getElementById('trade').addEventListener('input',render);
-for(const id of ['sector','kind','search'])document.getElementById(id).hidden=true;
+for(const id of ['sector','kind'])document.getElementById(id).hidden=true;
+document.getElementById('search').addEventListener('input',render);
 async function load(){try{
  let data=null;
  try{
