@@ -1,8 +1,9 @@
 name: Publish LA construction bid feed
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '23 */3 * * *'
+# Scheduled publishing retired: production is served by apdrafting/SignalEngine
+# at https://bidradaralerts.com, with its own Worker collector and cron.
+# Keep manual dispatch for legacy maintenance; it requires a real BIDRADAR_CSV_URL.
 permissions:
   contents: write
 concurrency:
